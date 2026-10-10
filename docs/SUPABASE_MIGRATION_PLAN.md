@@ -23,7 +23,7 @@ The schema uses snake_case fields and RLS. Client access is associated through `
 
 ## Required setup before clients can use the portal
 
-1. Apply `supabase/migrations/20261010140000_client_portal_support.sql` to the correct Supabase project.
+1. Apply `supabase/migrations/20261010135118_20261010140000_client_portal_support.sql` to the correct Supabase project.
 2. Verify all new tables, grants, policies, trigger, and foreign keys after application.
 3. Set `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` in Vercel Preview and Production.
 4. Configure Supabase Auth Site URL and redirect allowlist for the portal and `/reset-password`.
