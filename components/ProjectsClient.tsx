@@ -11,7 +11,7 @@ function badge(status: string) {
 }
 
 export default function ProjectsClient() {
-  const { currentProject, projects, loading } = useClientProjects();
+  const { currentProject, projects, loading, error } = useClientProjects();
 
   if (loading) return <div className="mx-auto max-w-[1200px]"><div className="panel h-80 animate-pulse" /></div>;
 
@@ -20,8 +20,8 @@ export default function ProjectsClient() {
       <div className="mx-auto max-w-3xl">
         <div className="panel p-8">
           <div className="mono-label">PROJECTS</div>
-          <h1 className="mt-2 text-3xl font-bold">Sin proyectos vinculados</h1>
-          <p className="mt-3 text-sm text-cb-muted">Cuando CBDEVS te asigne un proyecto, aqui aparecera su avance detallado.</p>
+          <h1 className="mt-2 text-3xl font-bold">{error ? "No se pudieron cargar los proyectos" : "Sin proyectos vinculados"}</h1>
+          <p className="mt-3 text-sm text-cb-muted">{error || "Cuando CBDEVS te asigne un proyecto, aquí aparecerá su avance detallado."}</p>
         </div>
       </div>
     );
