@@ -65,11 +65,31 @@ export default function BillingClient() {
         return;
       }
 
+      const { data: projectRows, error: projectLookupError } = await supabase
+        .from("cbdevs_projects")
+        .select("id")
+        .in("client_id", clientIds);
+      if (projectLookupError) {
+        console.error("[Billing] Project lookup failed:", projectLookupError.code);
+        if (active) { setError("No se pudieron verificar los proyectos para cargar la facturación."); setLoading(false); }
+        return;
+      }
+      const projectIds = (projectRows ?? []).map((project) => project.id as string);
+      const filters = [
+        clientIds.length ? `client_id.in.(${clientIds.join(",")})` : "",
+        projectIds.length ? `project_id.in.(${projectIds.join(",")})` : "",
+      ].filter(Boolean).join(",");
+
+      if (!filters) {
+        if (active) { setPayments([]); setLinks([]); setLoading(false); }
+        return;
+      }
+
       const [paymentResult, linkResult] = await Promise.all([
         supabase.from("cbdevs_payments").select("id, project_id, client_id, amount, currency, status, provider, provider_reference, paid_at, created_at")
-          .in("client_id", clientIds).order("created_at", { ascending: false }).limit(100),
+          .or(filters).order("created_at", { ascending: false }).limit(100),
         supabase.from("cbdevs_payment_links").select("id, project_id, client_id, amount, currency, status, url, expires_at, created_at")
-          .in("client_id", clientIds).eq("status", "active").order("created_at", { ascending: false }).limit(50),
+          .or(filters).eq("status", "active").order("created_at", { ascending: false }).limit(50),
       ]);
 
       if (paymentResult.error || linkResult.error) {
@@ -117,7 +137,7 @@ export default function BillingClient() {
       <div><div className="mono-label">BILLING</div><h1 className="mt-1 text-3xl font-bold">Pagos</h1><p className="mt-1 text-sm text-cb-muted">Consulta tu historial de pagos y los enlaces activos proporcionados por CBDEVS.</p></div>
       <div className="grid gap-4 md:grid-cols-3">
         <div className="panel p-5"><CreditCard className="mb-4 text-cb-amber" size={21} /><div className="text-sm text-cb-muted">Total del proyecto principal</div><div className="mt-1 text-2xl font-bold">{money(total, currency)}</div></div>
-        <div className="panel p-5"><ReceiptText className="mb-4 text-cb-amber" size={21} /><div className="text-sm text-cb-muted">Anticipo registrado</div><div className="mt-1 text-2xl font-bold">{money(paid, currency)}</div></div>
+        <div className="panel p-5"><ReceiptText className="mb-4 text-cb-amber" size={21} /><div className="text-sm text-cb-muted">Anticipo configurado</div><div className="mt-1 text-2xl font-bold">{money(paid, currency)}</div></div>
         <div className="panel p-5"><CreditCard className="mb-4 text-cb-amber" size={21} /><div className="text-sm text-cb-muted">Saldo estimado</div><div className="mt-1 text-2xl font-bold">{money(balance, currency)}</div></div>
       </div>
 
