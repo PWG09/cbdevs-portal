@@ -34,7 +34,7 @@ function safeCheckoutUrl(value: string | null) {
 }
 
 export default function BillingClient() {
-  const { currentProject, projects, loading: projectsLoading } = useClientProjects();
+  const { currentProject, loading: projectsLoading } = useClientProjects();
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [links, setLinks] = useState<Array<{ id: string; amount: number; currency: string; url: string; status: string; createdAt: string }>>([]);
   const [loading, setLoading] = useState(true);
