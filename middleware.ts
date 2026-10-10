@@ -1,4 +1,4 @@
-import { createServerClient } from "@supabase/ssr";
+import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 
 export async function middleware(request: NextRequest) {
@@ -19,7 +19,7 @@ export async function middleware(request: NextRequest) {
       getAll() {
         return request.cookies.getAll();
       },
-      setAll(cookiesToSet) {
+      setAll(cookiesToSet: { name: string; value: string; options: CookieOptions }[]) {
         cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
         response = NextResponse.next({ request });
         cookiesToSet.forEach(({ name, value, options }) => {
@@ -31,7 +31,12 @@ export async function middleware(request: NextRequest) {
 
   // getUser validates the access token with Supabase Auth and refreshes sessions
   // through the SSR cookie adapter when required. Authorization remains in RLS.
-  await supabase.auth.getUser();
+  try {
+    await supabase.auth.getUser();
+  } catch {
+    // A transient Auth outage must not leak protected data; the route guard and RLS
+    // still fail closed when they cannot verify the current session.
+  }
   return response;
 }
 
