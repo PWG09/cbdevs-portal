@@ -14,7 +14,13 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     let active = true;
-    const supabase = createClient();
+    let supabase: ReturnType<typeof createClient>;
+    try {
+      supabase = createClient();
+    } catch {
+      setState("error");
+      return;
+    }
 
     async function verify() {
       setState("checking");
