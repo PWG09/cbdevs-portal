@@ -7,6 +7,9 @@ begin;
 alter table public.cbdevs_channels
   add column if not exists project_id uuid references public.cbdevs_projects(id) on delete cascade;
 
+create unique index if not exists cbdevs_projects_org_id_id_uq
+  on public.cbdevs_projects(organization_id, id);
+
 create index if not exists cbdevs_channels_project_id_idx
   on public.cbdevs_channels(project_id);
 
@@ -90,8 +93,8 @@ using (
   exists (
     select 1 from public.cbdevs_projects p
     join public.cbdevs_clients c on c.id = p.client_id and c.organization_id = p.organization_id
-    where p.id = project_id
-      and p.organization_id = organization_id
+    where p.id = cbdevs_project_milestones.project_id
+      and p.organization_id = cbdevs_project_milestones.organization_id
       and c.linked_user_id = (select auth.uid())
       and c.active
   )
@@ -133,14 +136,50 @@ using (
   exists (
     select 1 from public.cbdevs_projects p
     join public.cbdevs_clients c on c.id = p.client_id and c.organization_id = p.organization_id
-    where p.id = project_id
-      and p.organization_id = organization_id
+    where p.id = cbdevs_project_documents.project_id
+      and p.organization_id = cbdevs_project_documents.organization_id
       and c.linked_user_id = (select auth.uid())
       and c.active
   )
 );
 
 -- Client portal access is limited to projects linked to the signed-in auth user.
+drop policy if exists cbdevs_clients_select on public.cbdevs_clients;
+create policy cbdevs_clients_select on public.cbdevs_clients
+for select to authenticated
+using (
+  (private.is_org_member(organization_id) and private.can_access_app(organization_id, 'admin'))
+  or (linked_user_id = (select auth.uid()) and active)
+);
+
+drop policy if exists cbdevs_projects_select on public.cbdevs_projects;
+create policy cbdevs_projects_select on public.cbdevs_projects
+for select to authenticated
+using (
+  (private.is_org_member(organization_id) and private.can_access_app(organization_id, 'admin'))
+  or exists (
+    select 1 from public.cbdevs_clients c
+    where c.id = cbdevs_projects.client_id
+      and c.organization_id = cbdevs_projects.organization_id
+      and c.linked_user_id = (select auth.uid())
+      and c.active
+  )
+);
+
+drop policy if exists cbdevs_payments_select on public.cbdevs_payments;
+create policy cbdevs_payments_select on public.cbdevs_payments
+for select to authenticated
+using (
+  (private.is_org_member(organization_id) and private.can_access_app(organization_id, 'admin'))
+  or exists (
+    select 1 from public.cbdevs_clients c
+    where c.id = cbdevs_payments.client_id
+      and c.organization_id = cbdevs_payments.organization_id
+      and c.linked_user_id = (select auth.uid())
+      and c.active
+  )
+);
+
 drop policy if exists cbdevs_channels_client_select on public.cbdevs_channels;
 create policy cbdevs_channels_client_select on public.cbdevs_channels
 for select to authenticated
@@ -148,8 +187,8 @@ using (
   project_id is not null and exists (
     select 1 from public.cbdevs_projects p
     join public.cbdevs_clients c on c.id = p.client_id and c.organization_id = p.organization_id
-    where p.id = project_id
-      and p.organization_id = organization_id
+    where p.id = cbdevs_channels.project_id
+      and p.organization_id = cbdevs_channels.organization_id
       and c.linked_user_id = (select auth.uid())
       and c.active
   )
@@ -164,8 +203,8 @@ using (
     from public.cbdevs_channels ch
     join public.cbdevs_projects p on p.id = ch.project_id and p.organization_id = ch.organization_id
     join public.cbdevs_clients c on c.id = p.client_id and c.organization_id = p.organization_id
-    where ch.id = channel_id
-      and ch.organization_id = organization_id
+    where ch.id = cbdevs_messages.channel_id
+      and ch.organization_id = cbdevs_messages.organization_id
       and c.linked_user_id = (select auth.uid())
       and c.active
   )
@@ -197,8 +236,8 @@ using (
   and (expires_at is null or expires_at > now())
   and exists (
     select 1 from public.cbdevs_clients c
-    where c.id = client_id
-      and c.organization_id = organization_id
+    where c.id = cbdevs_payment_links.client_id
+      and c.organization_id = cbdevs_payment_links.organization_id
       and c.linked_user_id = (select auth.uid())
       and c.active
   )
@@ -216,7 +255,9 @@ begin
   on conflict do nothing;
   return new;
 end;
-$$;
+$;
+
+revoke all on function private.create_project_channel() from public, anon, authenticated;
 
 drop trigger if exists cbdevs_projects_create_channel on public.cbdevs_projects;
 create trigger cbdevs_projects_create_channel
