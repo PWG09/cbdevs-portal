@@ -8,9 +8,9 @@ const contentSecurityPolicy = [
   "frame-ancestors 'none'",
   "object-src 'none'",
   "script-src 'self' 'unsafe-inline'",
-  "style-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data: blob: https:",
-  "font-src 'self' data: https:",
+  "font-src 'self' data: https://fonts.gstatic.com https:",
   `connect-src 'self' ${supabaseOrigin} wss://rpfupihdsqxprhptxypv.supabase.co`,
   "upgrade-insecure-requests",
 ].join("; ");
