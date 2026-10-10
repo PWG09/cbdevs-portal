@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { CreditCard, ExternalLink, ReceiptText, AlertTriangle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { safeExternalUrl } from "@/lib/safe-url";
 import { useClientProjects } from "@/components/useClientProjects";
 import type { PaymentRecord } from "@/lib/types";
 
@@ -24,13 +25,7 @@ function statusClass(status: string) {
 }
 
 function safeCheckoutUrl(value: string | null) {
-  if (!value) return undefined;
-  try {
-    const url = new URL(value);
-    return url.protocol === "https:" ? url.toString() : undefined;
-  } catch {
-    return undefined;
-  }
+  return safeExternalUrl(value);
 }
 
 export default function BillingClient() {
