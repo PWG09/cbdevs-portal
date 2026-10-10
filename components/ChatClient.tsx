@@ -17,6 +17,7 @@ export default function ChatClient() {
   const [error, setError] = useState("");
   const [channelId, setChannelId] = useState<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
+  const currentProjectId = currentProject?.id;
 
   const loadMessages = useCallback(async (projectId: string) => {
     const supabase = createClient();
@@ -71,7 +72,7 @@ export default function ChatClient() {
 
   useEffect(() => {
     if (projectsLoading) return;
-    if (!currentProject) {
+    if (!currentProjectId) {
       setMessages([]);
       setChannelId(null);
       setLoading(false);
@@ -83,17 +84,17 @@ export default function ChatClient() {
     setError("");
 
     const run = async () => {
-      await loadMessages(currentProject.id);
+      await loadMessages(currentProjectId);
       if (active) setLoading(false);
     };
     void run();
-    const interval = window.setInterval(() => { void loadMessages(currentProject.id); }, 15000);
+    const interval = window.setInterval(() => { void loadMessages(currentProjectId); }, 15000);
 
     return () => {
       active = false;
       window.clearInterval(interval);
     };
-  }, [currentProject?.id, loadMessages, projectsLoading]);
+  }, [currentProjectId, loadMessages, projectsLoading]);
 
   useEffect(() => bottom.current?.scrollIntoView({ behavior: "smooth" }), [messages.length]);
 
