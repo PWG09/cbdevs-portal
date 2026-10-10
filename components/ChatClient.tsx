@@ -20,6 +20,13 @@ export default function ChatClient() {
 
   const loadMessages = useCallback(async (projectId: string) => {
     const supabase = createClient();
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) {
+      setMessages([]);
+      setChannelId(null);
+      return;
+    }
+
     const { data: channel, error: channelError } = await supabase
       .from("cbdevs_channels")
       .select("id")
@@ -56,7 +63,7 @@ export default function ChatClient() {
       id: row.id,
       channelId: row.channel_id,
       senderId: row.sender_id,
-      senderName: row.sender_id === (createClient().auth.getUser as unknown as string) ? "Tú" : "CBDEVS",
+      senderName: row.sender_id === auth.user?.id ? "Tú" : "CBDEVS",
       text: row.text,
       createdAt: row.created_at,
     })));
@@ -74,7 +81,6 @@ export default function ChatClient() {
     let active = true;
     setLoading(true);
     setError("");
-    const supabase = createClient();
 
     const run = async () => {
       await loadMessages(currentProject.id);
@@ -86,7 +92,6 @@ export default function ChatClient() {
     return () => {
       active = false;
       window.clearInterval(interval);
-      void supabase.removeAllChannels();
     };
   }, [currentProject?.id, loadMessages, projectsLoading]);
 
