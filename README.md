@@ -47,7 +47,7 @@ The portal reads from the shared `cbdevsmain` project using the existing tables:
 - `cbdevs_channels`
 - `cbdevs_messages`
 
-The migration in `supabase/migrations/20261010135118_20261010140000_client_portal_support.sql` adds project milestones/documents, project-channel linking, and narrowly scoped client RLS policies.
+The migrations in `supabase/migrations/` add project milestones/documents, project-channel linking, client-specific RLS policies, consolidated policy evaluation, and indexes for the new foreign keys. Apply them in filename order and verify each version in Supabase migration history.
 
 Apply the migration to the intended Supabase project after reviewing it. Verify the tables and policies afterward. Do not disable RLS to fix a portal error.
 
