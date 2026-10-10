@@ -178,6 +178,14 @@ using (
       and c.linked_user_id = (select auth.uid())
       and c.active
   )
+  or exists (
+    select 1 from public.cbdevs_projects p
+    join public.cbdevs_clients c on c.id = p.client_id and c.organization_id = p.organization_id
+    where p.id = cbdevs_payments.project_id
+      and p.organization_id = cbdevs_payments.organization_id
+      and c.linked_user_id = (select auth.uid())
+      and c.active
+  )
 );
 
 drop policy if exists cbdevs_channels_client_select on public.cbdevs_channels;
@@ -234,12 +242,22 @@ for select to authenticated
 using (
   status = 'active'
   and (expires_at is null or expires_at > now())
-  and exists (
-    select 1 from public.cbdevs_clients c
-    where c.id = cbdevs_payment_links.client_id
-      and c.organization_id = cbdevs_payment_links.organization_id
-      and c.linked_user_id = (select auth.uid())
-      and c.active
+  and (
+    exists (
+      select 1 from public.cbdevs_clients c
+      where c.id = cbdevs_payment_links.client_id
+        and c.organization_id = cbdevs_payment_links.organization_id
+        and c.linked_user_id = (select auth.uid())
+        and c.active
+    )
+    or exists (
+      select 1 from public.cbdevs_projects p
+      join public.cbdevs_clients c on c.id = p.client_id and c.organization_id = p.organization_id
+      where p.id = cbdevs_payment_links.project_id
+        and p.organization_id = cbdevs_payment_links.organization_id
+        and c.linked_user_id = (select auth.uid())
+        and c.active
+    )
   )
 );
 
