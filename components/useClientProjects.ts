@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import type { Project, ProjectDocument, ProjectMilestone } from "@/lib/types";
 
@@ -78,12 +78,16 @@ export function useClientProjects() {
   const [loading, setLoading] = useState(true);
   const [live, setLive] = useState(false);
   const [error, setError] = useState("");
+  const requestVersion = useRef(0);
 
   const loadProjects = useCallback(async () => {
+    const requestId = ++requestVersion.current;
+    const isCurrent = () => requestVersion.current === requestId;
     const supabase = createClient();
     setError("");
 
     const { data: userResult, error: userError } = await supabase.auth.getUser();
+    if (!isCurrent()) return;
     if (userError || !userResult.user) {
       setProjects([]);
       setLive(false);
@@ -97,6 +101,7 @@ export function useClientProjects() {
       .select("id, organization_id, linked_user_id, name, email")
       .eq("linked_user_id", userResult.user.id)
       .eq("active", true);
+    if (!isCurrent()) return;
 
     if (clientError) {
       console.error("[Portal] Client lookup failed:", clientError.code);
@@ -122,6 +127,7 @@ export function useClientProjects() {
       .select("id, organization_id, client_id, client_name, name, service_type, delivery_status, payment_status, currency, amount, initial_payment, monthly_maintenance, start_date, estimated_delivery, actual_delivery, next_maintenance_date, responsible_user_ids, notes, repo_url, production_url, proposal_url, updated_at")
       .in("client_id", clientIds)
       .order("estimated_delivery", { ascending: true, nullsFirst: false });
+    if (!isCurrent()) return;
 
     if (projectError) {
       console.error("[Portal] Project query failed:", projectError.code);
@@ -153,6 +159,7 @@ export function useClientProjects() {
         .in("project_id", projectIds)
         .order("created_at", { ascending: false }),
     ]);
+    if (!isCurrent()) return;
 
     if (milestoneResult.error || documentResult.error) {
       console.error("[Portal] Project details query failed:", {
@@ -221,6 +228,7 @@ export function useClientProjects() {
 
     return () => {
       mounted = false;
+      requestVersion.current += 1;
       authListener.subscription.unsubscribe();
       window.removeEventListener("focus", onFocus);
     };
