@@ -5,6 +5,12 @@ import { usePathname, useRouter } from "next/navigation";
 import { AlertTriangle, LogOut, ShieldCheck } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
+// Explicit allowlist for the CBDEVS Portal global administrator.
+// Use the immutable Supabase Auth user ID, never an email-only check.
+const GLOBAL_ADMIN_USER_IDS = new Set([
+  "ec735f4c-fdb8-4d6b-b672-c2574ff34832",
+]);
+
 type GuardState = "checking" | "allowed" | "unlinked" | "error";
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
@@ -30,6 +36,13 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
         if (error || !data.user) {
           router.replace(`/login?next=${encodeURIComponent(pathname || "/dashboard")}`);
+          return;
+        }
+
+        // Global admin accounts are staff accounts, not customer records.
+        // They can enter the portal without a cbdevs_clients row.
+        if (GLOBAL_ADMIN_USER_IDS.has(data.user.id)) {
+          setState("allowed");
           return;
         }
 
