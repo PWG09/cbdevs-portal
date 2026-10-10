@@ -17,11 +17,15 @@ export default function ChatClient() {
   const [error, setError] = useState("");
   const [channelId, setChannelId] = useState<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
+  const requestVersion = useRef(0);
   const currentProjectId = currentProject?.id;
 
   const loadMessages = useCallback(async (projectId: string) => {
+    const requestId = ++requestVersion.current;
+    const isCurrent = () => requestVersion.current === requestId;
     const supabase = createClient();
     const { data: auth } = await supabase.auth.getUser();
+    if (!isCurrent()) return;
     if (!auth.user) {
       setMessages([]);
       setChannelId(null);
@@ -35,6 +39,7 @@ export default function ChatClient() {
       .limit(1)
       .maybeSingle();
 
+    if (!isCurrent()) return;
     if (channelError) {
       console.error("[Chat] Channel lookup failed:", channelError.code);
       setError("No se pudo cargar el canal de mensajes.");
@@ -53,6 +58,7 @@ export default function ChatClient() {
       .eq("channel_id", channel.id)
       .order("created_at", { ascending: true })
       .limit(150);
+    if (!isCurrent()) return;
 
     if (messageError) {
       console.error("[Chat] Message query failed:", messageError.code);
@@ -92,6 +98,7 @@ export default function ChatClient() {
 
     return () => {
       active = false;
+      requestVersion.current += 1;
       window.clearInterval(interval);
     };
   }, [currentProjectId, loadMessages, projectsLoading]);
