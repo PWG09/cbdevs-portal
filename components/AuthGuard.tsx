@@ -18,29 +18,32 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
 
     async function verify() {
       setState("checking");
-      const { data, error } = await supabase.auth.getUser();
-      if (!active) return;
+      try {
+        const { data, error } = await supabase.auth.getUser();
+        if (!active) return;
 
-      if (error || !data.user) {
-        setState("checking");
-        router.replace(`/login?next=${encodeURIComponent(pathname || "/dashboard")}`);
-        return;
+        if (error || !data.user) {
+          router.replace(`/login?next=${encodeURIComponent(pathname || "/dashboard")}`);
+          return;
+        }
+
+        const { data: clients, error: clientError } = await supabase
+          .from("cbdevs_clients")
+          .select("id")
+          .eq("linked_user_id", data.user.id)
+          .eq("active", true)
+          .limit(1);
+
+        if (!active) return;
+        if (clientError) {
+          console.error("[AuthGuard] Client authorization lookup failed:", clientError.code);
+          setState("error");
+          return;
+        }
+        setState(clients?.length ? "allowed" : "unlinked");
+      } catch {
+        if (active) setState("error");
       }
-
-      const { data: clients, error: clientError } = await supabase
-        .from("cbdevs_clients")
-        .select("id")
-        .eq("linked_user_id", data.user.id)
-        .eq("active", true)
-        .limit(1);
-
-      if (!active) return;
-      if (clientError) {
-        console.error("[AuthGuard] Client authorization lookup failed:", clientError.code);
-        setState("error");
-        return;
-      }
-      setState(clients?.length ? "allowed" : "unlinked");
     }
 
     void verify();
