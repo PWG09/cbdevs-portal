@@ -4,6 +4,7 @@ import { ArrowUpRight, CalendarClock, CheckCircle2, CircleDollarSign, FolderKanb
 import Link from "next/link";
 import { useClientProjects } from "@/components/useClientProjects";
 import type { Project } from "@/lib/types";
+import { safeExternalUrl } from "@/lib/safe-url";
 
 const money = (n: number, c: string) => new Intl.NumberFormat("es-MX", { style: "currency", currency: c }).format(n);
 
@@ -51,6 +52,7 @@ export default function DashboardClient() {
     );
   }
 
+  const productionUrl = safeExternalUrl(currentProject.productionUrl);
   const progress = progressFor(currentProject);
   const balance = Math.max(currentProject.amount - currentProject.initialPayment, 0);
   const completed = currentProject.milestones?.filter(m => m.status === "Completado").length ?? 0;
@@ -87,7 +89,7 @@ export default function DashboardClient() {
           </div>
 
           <div className="mt-6 flex flex-wrap gap-3">
-            {currentProject.productionUrl && <a href={currentProject.productionUrl} target="_blank" className="btn-primary">Ver entrega <ArrowUpRight size={16} /></a>}
+            {productionUrl && <a href={productionUrl} target="_blank" rel="noopener noreferrer" className="btn-primary">Ver entrega <ArrowUpRight size={16} /></a>}
             <Link href="/chat" className="btn-ghost"><MessageSquare size={16} /> Mensajes</Link>
             {currentProject.nextMaintenanceDate && <Link href="/billing" className="btn-ghost"><Wrench size={16} /> Mantenimiento</Link>}
           </div>
