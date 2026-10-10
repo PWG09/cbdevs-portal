@@ -2,6 +2,7 @@
 
 import { CalendarClock, CheckCircle2, ExternalLink, FileText, Globe2 } from "lucide-react";
 import { useClientProjects } from "@/components/useClientProjects";
+import { safeExternalUrl } from "@/lib/safe-url";
 
 function badge(status: string) {
   if (status === "Completado" || status === "Entregado" || status === "Pagado completo" || status === "Mantenimiento al dia") return "bg-emerald-500/10 text-emerald-300";
@@ -11,7 +12,7 @@ function badge(status: string) {
 }
 
 export default function ProjectsClient() {
-  const { currentProject, projects, loading } = useClientProjects();
+  const { currentProject, projects, loading, error } = useClientProjects();
 
   if (loading) return <div className="mx-auto max-w-[1200px]"><div className="panel h-80 animate-pulse" /></div>;
 
@@ -20,12 +21,15 @@ export default function ProjectsClient() {
       <div className="mx-auto max-w-3xl">
         <div className="panel p-8">
           <div className="mono-label">PROJECTS</div>
-          <h1 className="mt-2 text-3xl font-bold">Sin proyectos vinculados</h1>
-          <p className="mt-3 text-sm text-cb-muted">Cuando CBDEVS te asigne un proyecto, aqui aparecera su avance detallado.</p>
+          <h1 className="mt-2 text-3xl font-bold">{error ? "No se pudieron cargar los proyectos" : "Sin proyectos vinculados"}</h1>
+          <p className="mt-3 text-sm text-cb-muted">{error || "Cuando CBDEVS te asigne un proyecto, aquí aparecerá su avance detallado."}</p>
         </div>
       </div>
     );
   }
+
+  const productionUrl = safeExternalUrl(currentProject.productionUrl);
+  const documents = (currentProject.documents ?? []).map((document) => ({ ...document, safeUrl: safeExternalUrl(document.url) })).filter((document) => document.safeUrl);
 
   return (
     <div className="mx-auto max-w-[1300px] space-y-6">
@@ -81,15 +85,15 @@ export default function ProjectsClient() {
         <div className="mono-label">FILES & LINKS</div>
         <h2 className="mt-1 text-xl font-semibold">Documentos y entregas</h2>
         <div className="mt-5 grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {currentProject.productionUrl && (
-            <a href={currentProject.productionUrl} target="_blank" className="rounded-xl border border-cb-line bg-cb-bg p-4 transition hover:border-cb-amber">
+          {productionUrl && (
+            <a href={productionUrl} target="_blank" rel="noopener noreferrer" className="rounded-xl border border-cb-line bg-cb-bg p-4 transition hover:border-cb-amber">
               <Globe2 className="mb-3 text-cb-amber" size={20} />
               <div className="font-semibold">Sitio en produccion</div>
               <div className="mt-2 flex items-center gap-1 text-xs text-cb-muted">Abrir enlace <ExternalLink size={12} /></div>
             </a>
           )}
-          {(currentProject.documents ?? []).map(doc => (
-            <a key={doc.id} href={doc.url} target="_blank" className="rounded-xl border border-cb-line bg-cb-bg p-4 transition hover:border-cb-amber">
+          {documents.map(doc => (
+            <a key={doc.id} href={doc.safeUrl} target="_blank" rel="noopener noreferrer" className="rounded-xl border border-cb-line bg-cb-bg p-4 transition hover:border-cb-amber">
               <FileText className="mb-3 text-cb-amber" size={20} />
               <div className="font-semibold">{doc.title}</div>
               <div className="mt-2 flex items-center gap-1 text-xs text-cb-muted">{doc.type} <ExternalLink size={12} /></div>

@@ -1,144 +1,177 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { addDoc, collection, limit, onSnapshot, query, serverTimestamp, where } from "firebase/firestore";
-import { getAuthClient, getDbClient } from "@/lib/firebase";
-import type { ChatMessage } from "@/lib/types";
-import { Hash, Send, MessageSquare } from "lucide-react";
+import { FormEvent, useCallback, useEffect, useRef, useState } from "react";
+import { Hash, Send, MessageSquare, AlertTriangle } from "lucide-react";
 import { useClientProjects } from "@/components/useClientProjects";
+import { createClient } from "@/lib/supabase/client";
+import type { ChatMessage } from "@/lib/types";
+
+type MessageRow = { id: string; channel_id: string; sender_id: string; text: string; created_at: string };
 
 export default function ChatClient() {
-  const { currentProject, loading } = useClientProjects();
+  const { currentProject, loading: projectsLoading } = useClientProjects();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [text, setText] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState("");
+  const [channelId, setChannelId] = useState<string | null>(null);
   const bottom = useRef<HTMLDivElement>(null);
+  const requestVersion = useRef(0);
+  const currentProjectId = currentProject?.id;
+
+  const loadMessages = useCallback(async (projectId: string) => {
+    const requestId = ++requestVersion.current;
+    const isCurrent = () => requestVersion.current === requestId;
+    const supabase = createClient();
+    const { data: auth } = await supabase.auth.getUser();
+    if (!isCurrent()) return;
+    if (!auth.user) {
+      setMessages([]);
+      setChannelId(null);
+      return;
+    }
+
+    const { data: channel, error: channelError } = await supabase
+      .from("cbdevs_channels")
+      .select("id")
+      .eq("project_id", projectId)
+      .limit(1)
+      .maybeSingle();
+
+    if (!isCurrent()) return;
+    if (channelError) {
+      console.error("[Chat] Channel lookup failed:", channelError.code);
+      setError("No se pudo cargar el canal de mensajes.");
+      return;
+    }
+    if (!channel) {
+      setChannelId(null);
+      setMessages([]);
+      return;
+    }
+
+    setChannelId(channel.id);
+    const { data, error: messageError } = await supabase
+      .from("cbdevs_messages")
+      .select("id, channel_id, sender_id, text, created_at")
+      .eq("channel_id", channel.id)
+      .order("created_at", { ascending: true })
+      .limit(150);
+    if (!isCurrent()) return;
+
+    if (messageError) {
+      console.error("[Chat] Message query failed:", messageError.code);
+      setError("No se pudieron cargar los mensajes. Comprueba que la migración del portal esté aplicada.");
+      return;
+    }
+
+    setMessages(((data ?? []) as MessageRow[]).map((row) => ({
+      id: row.id,
+      channelId: row.channel_id,
+      senderId: row.sender_id,
+      senderName: row.sender_id === auth.user?.id ? "Tú" : "CBDEVS",
+      text: row.text,
+      createdAt: row.created_at,
+    })));
+  }, []);
 
   useEffect(() => {
-    let unsubscribe: (() => void) | null = null;
-    try {
-      const db = getDbClient();
-      if (!db) {
-        console.error("[Chat] Firestore database client not available.");
-        return;
-      }
-
-      if (!currentProject) return;
-
-      const q = query(
-        collection(db, "messages"),
-        where("channelId", "==", `project:${currentProject.id}`),
-        limit(150)
-      );
-
-      unsubscribe = onSnapshot(
-        q,
-        (snap) => {
-          try {
-            const msgs = (snap.docs.map(d => ({ id: d.id, ...d.data() })) as ChatMessage[]).sort((a, b) => {
-              const aTime = "toDate" in (a.createdAt ?? {}) ? (a.createdAt as any).toDate().getTime() : 0;
-              const bTime = "toDate" in (b.createdAt ?? {}) ? (b.createdAt as any).toDate().getTime() : 0;
-              return aTime - bTime;
-            });
-            setMessages(msgs);
-          } catch (renderError) {
-            console.error("[Chat] Error processing snapshot data:", renderError);
-          }
-        },
-        (error) => {
-          console.error("[Chat] Firestore Subscription Error:", error);
-          if (error.code === 'permission-denied') {
-            console.error("[Chat] Permission Denied: Please check your Firestore Rules in the Firebase Console.");
-          }
-        }
-      );
-    } catch (setupError) {
-      console.error("[Chat] CRITICAL Error setting up chat query:", setupError);
+    if (projectsLoading) return;
+    if (!currentProjectId) {
+      setMessages([]);
+      setChannelId(null);
+      setLoading(false);
+      return;
     }
-    return () => {
-      if (unsubscribe) unsubscribe();
+
+    let active = true;
+    setLoading(true);
+    setError("");
+
+    const run = async () => {
+      await loadMessages(currentProjectId);
+      if (active) setLoading(false);
     };
-  }, [currentProject]);
+    void run();
+    const interval = window.setInterval(() => { void loadMessages(currentProjectId); }, 15000);
+
+    return () => {
+      active = false;
+      requestVersion.current += 1;
+      window.clearInterval(interval);
+    };
+  }, [currentProjectId, loadMessages, projectsLoading]);
 
   useEffect(() => bottom.current?.scrollIntoView({ behavior: "smooth" }), [messages.length]);
 
-  async function send(e: React.FormEvent) {
-    e.preventDefault();
+  async function send(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
     const value = text.trim();
-    const auth = getAuthClient();
-    const db = getDbClient();
-    if (!value || !auth?.currentUser || !db || !currentProject) return;
-    try {
-      await addDoc(collection(db, "messages"), {
-        channelId: `project:${currentProject.id}`,
-        projectId: currentProject.id,
-        senderId: auth.currentUser.uid,
-        senderName: auth.currentUser.displayName || auth.currentUser.email?.split("@")[0] || "Usuario",
-        text: value,
-        createdAt: serverTimestamp(),
-      });
-      setText("");
-    } catch (err) {
-      console.error("[Chat] Error sending message:", err);
+    if (!value || value.length > 4000 || !currentProject || !channelId || sending) return;
+
+    setSending(true);
+    setError("");
+    const supabase = createClient();
+    const { data: auth } = await supabase.auth.getUser();
+    if (!auth.user) {
+      setError("Tu sesión expiró. Vuelve a iniciar sesión.");
+      setSending(false);
+      return;
     }
+
+    const { error: insertError } = await supabase.from("cbdevs_messages").insert({
+      organization_id: currentProject.organizationId,
+      channel_id: channelId,
+      sender_id: auth.user.id,
+      text: value,
+    });
+
+    if (insertError) {
+      console.error("[Chat] Message insert failed:", insertError.code);
+      setError("No se pudo enviar el mensaje. Comprueba tu conexión e inténtalo otra vez.");
+    } else {
+      setText("");
+      await loadMessages(currentProject.id);
+    }
+    setSending(false);
   }
 
   return (
     <div className="mx-auto max-w-[1100px] space-y-5">
-      <div><div className="mono-label">PROJECT / MESSAGES</div><h1 className="mt-1 text-3xl font-bold">Mensajes</h1><p className="mt-1 text-sm text-cb-muted">Comunicación directa con CBDEVS sobre tu proyecto.</p></div>
-      <div className="panel flex h-[calc(100vh-210px)] min-h-[520px] flex-col overflow-hidden">
-        <div className="flex items-center gap-3 border-b border-cb-line bg-cb-panel2 px-5 py-4"><div className="rounded-lg bg-cb-amber/10 p-2 text-cb-amber"><Hash size={17}/></div><div><div className="font-semibold">{currentProject?.name || "Proyecto"}</div><div className="text-xs text-slate-500">{loading ? "Cargando..." : "Canal privado del proyecto"}</div></div></div>
-        <div className="scrollbar flex-1 space-y-4 overflow-y-auto p-5">
-          {messages.length === 0 && <div className="grid h-full place-items-center text-center text-slate-600"><MessageSquare className="mx-auto mb-3"/><p>Aún no hay mensajes.</p><p className="text-xs">Sé el primero en escribir.</p></div>}
-          {messages.map(m => {
-            try {
-              if (!m || typeof m !== 'object') return null;
-
-              const senderName = (typeof m.senderName === 'string') ? m.senderName : "Usuario";
-              const messageText = (typeof m.text === 'string') ? m.text : "";
-
-              const timestamp = (() => {
-                const value = m.createdAt;
-                if (!value) return "ahora";
-
-                if (typeof value === 'object' && 'toDate' in value && typeof (value as any).toDate === 'function') {
-                  return (value as any).toDate().toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  });
-                }
-                if (value instanceof Date) {
-                  return value.toLocaleTimeString([], {
-                    hour: "2-digit",
-                    minute: "2-digit",
-                  });
-                }
-                return "ahora";
-              })();
-
-              return (
-                <div key={m.id} className="flex gap-3">
-                  <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-cb-panel2 font-mono text-xs text-cb-amber">
-                    {senderName.slice(0, 2).toUpperCase()}
-                  </div>
-                  <div>
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-sm font-semibold">{senderName}</span>
-                      <span className="text-[10px] text-slate-600">{timestamp}</span>
-                    </div>
-                    <div className="mt-1 rounded-2xl rounded-tl-sm border border-cb-line bg-cb-panel2 px-3 py-2 text-sm text-slate-200">
-                      {messageText}
-                    </div>
-                  </div>
+      <div><div className="mono-label">PROJECT / MESSAGES</div><h1 className="mt-1 text-3xl font-bold">Mensajes</h1><p className="mt-1 text-sm text-cb-muted">Comunicación privada con CBDEVS sobre tu proyecto.</p></div>
+      <div className="panel flex h-[calc(100dvh-230px)] min-h-[420px] flex-col overflow-hidden">
+        <div className="flex items-center gap-3 border-b border-cb-line bg-cb-panel2 px-5 py-4">
+          <div className="rounded-lg bg-cb-amber/10 p-2 text-cb-amber"><Hash size={17}/></div>
+          <div><div className="font-semibold">{currentProject?.name || "Proyecto"}</div><div className="text-xs text-slate-500">{projectsLoading ? "Cargando proyecto..." : "Canal privado del proyecto"}</div></div>
+        </div>
+        <div className="scrollbar flex-1 space-y-4 overflow-y-auto p-5" aria-live="polite">
+          {projectsLoading || loading ? <p className="text-sm text-cb-muted">Cargando mensajes...</p> : null}
+          {!projectsLoading && !currentProject && <p className="text-sm text-cb-muted">Todavía no tienes un proyecto vinculado.</p>}
+          {!projectsLoading && currentProject && !channelId && <p className="text-sm text-cb-muted">El canal del proyecto todavía no está configurado. El equipo de CBDEVS debe aplicar la migración del portal.</p>}
+          {messages.length === 0 && channelId && !loading && <div className="grid h-full place-items-center text-center text-slate-600"><MessageSquare className="mx-auto mb-3"/><p>Aún no hay mensajes.</p><p className="text-xs">Puedes iniciar la conversación aquí.</p></div>}
+          {messages.map((message) => {
+            const mine = message.senderName === "Tú";
+            return (
+              <div key={message.id} className={`flex gap-3 ${mine ? "flex-row-reverse" : ""}`}>
+                <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-cb-panel2 font-mono text-xs text-cb-amber">{mine ? "TÚ" : "CB"}</div>
+                <div className={`max-w-[85%] min-w-0 sm:max-w-[75%] ${mine ? "text-right" : ""}`}>
+                  <div className="flex items-baseline gap-2"><span className="text-sm font-semibold">{message.senderName}</span><span className="text-[10px] text-slate-600">{message.createdAt ? new Date(message.createdAt).toLocaleTimeString("es-MX", { hour: "2-digit", minute: "2-digit" }) : ""}</span></div>
+                  <div className={`mt-1 whitespace-pre-wrap break-words rounded-2xl border border-cb-line px-3 py-2 text-left text-sm text-slate-200 ${mine ? "rounded-tr-sm bg-cb-amber/10" : "rounded-tl-sm bg-cb-panel2"}`}>{message.text}</div>
                 </div>
-              );
-            } catch (e) {
-              console.error("Error renderizando mensaje:", e);
-              return null;
-            }
+              </div>
+            );
           })}
           <div ref={bottom}/>
         </div>
-        <form onSubmit={send} className="border-t border-cb-line bg-cb-panel2 p-3"><div className="flex gap-2"><input className="input" value={text} onChange={e=>setText(e.target.value)} placeholder="Escribe un mensaje..." /><button className="btn-primary px-3"><Send size={17}/></button></div></form>
+        {error && <div className="flex items-start gap-2 border-t border-red-500/20 bg-red-500/5 p-3 text-sm text-red-200" role="alert"><AlertTriangle size={16} className="mt-0.5 shrink-0"/>{error}</div>}
+        <form onSubmit={send} className="border-t border-cb-line bg-cb-panel2 p-3">
+          <div className="flex gap-2">
+            <label className="sr-only" htmlFor="portal-message">Escribe un mensaje</label>
+            <input id="portal-message" className="input min-w-0" value={text} onChange={(event) => setText(event.target.value)} placeholder="Escribe un mensaje..." maxLength={4000} disabled={!channelId || sending} />
+            <button className="btn-primary shrink-0 px-3" disabled={!text.trim() || !channelId || sending} aria-label="Enviar mensaje"><Send size={17}/></button>
+          </div>
+        </form>
       </div>
     </div>
   );

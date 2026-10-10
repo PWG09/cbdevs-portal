@@ -1,19 +1,21 @@
-export type Role = "admin" | "empleado" | "cliente";
-export type ServiceType = "Sitio Web" | "Aplicación Web" | "Software Personalizado/Automatización";
+export type Role = "cliente";
+export type ServiceType = "Sitio Web" | "Aplicación Web" | "Software Personalizado/Automatización" | string;
 export type DeliveryStatus =
   | "Cotizado"
   | "En desarrollo"
   | "En revisión"
   | "Entregado"
   | "En mantenimiento"
-  | "Pausado/Cancelado";
+  | "Pausado/Cancelado"
+  | string;
 export type PaymentStatus =
   | "Pendiente"
   | "Pago inicial recibido"
   | "Pagado parcial"
   | "Pagado completo"
   | "Mantenimiento al día"
-  | "Mantenimiento atrasado";
+  | "Mantenimiento atrasado"
+  | string;
 
 export interface UserProfile {
   id: string;
@@ -22,17 +24,19 @@ export interface UserProfile {
   role: Role;
   photoURL?: string;
   active: boolean;
-  createdAt?: unknown;
+  createdAt?: string;
 }
 
 export interface Project {
   id: string;
+  organizationId: string;
+  clientId: string;
   name: string;
   client: string;
   serviceType: ServiceType;
   deliveryStatus: DeliveryStatus;
   paymentStatus: PaymentStatus;
-  currency: "MXN" | "USD";
+  currency: "MXN" | "USD" | string;
   amount: number;
   initialPayment: number;
   monthlyMaintenance: number;
@@ -45,41 +49,37 @@ export interface Project {
   repoUrl?: string;
   productionUrl?: string;
   proposalUrl?: string;
-  clientUid?: string;
-  clientEmail?: string;
   milestones?: ProjectMilestone[];
   documents?: ProjectDocument[];
-  updatedAt?: unknown;
+  updatedAt?: string;
 }
 
 export interface ProjectMilestone {
   id: string;
   title: string;
-  status: "Pendiente" | "En progreso" | "Completado";
+  status: "Pendiente" | "En progreso" | "Completado" | string;
   dueDate?: string;
+  sortOrder?: number;
 }
 
 export interface ProjectDocument {
   id: string;
   title: string;
   url: string;
-  type: "Propuesta" | "Contrato" | "Factura" | "Entrega" | "Otro";
+  type: "Propuesta" | "Contrato" | "Factura" | "Entrega" | "Otro" | string;
   createdAt?: string;
 }
 
 export interface PaymentRecord {
   id: string;
+  projectId?: string;
   amount: number;
-  currency: "MXN" | "USD";
-  status: "pending" | "paid" | "failed" | "refunded";
+  currency: "MXN" | "USD" | string;
+  status: "pending" | "paid" | "failed" | "refunded" | string;
   description: string;
   checkoutUrl?: string;
-  createdAt?: {
-    toDate?: () => Date;
-  } | Date;
-  paidAt?: {
-    toDate?: () => Date;
-  } | Date;
+  createdAt?: string;
+  paidAt?: string;
 }
 
 export interface ChatMessage {
@@ -87,9 +87,6 @@ export interface ChatMessage {
   channelId: string;
   senderId: string;
   senderName: string;
-  senderPhotoURL?: string;
   text: string;
-  createdAt?: {
-  toDate?: () => Date;
-} | Date;
+  createdAt?: string;
 }

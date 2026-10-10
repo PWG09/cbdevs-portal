@@ -4,6 +4,7 @@ import { ArrowUpRight, CalendarClock, CheckCircle2, CircleDollarSign, FolderKanb
 import Link from "next/link";
 import { useClientProjects } from "@/components/useClientProjects";
 import type { Project } from "@/lib/types";
+import { safeExternalUrl } from "@/lib/safe-url";
 
 const money = (n: number, c: string) => new Intl.NumberFormat("es-MX", { style: "currency", currency: c }).format(n);
 
@@ -33,7 +34,7 @@ function statusClass(status: string) {
 }
 
 export default function DashboardClient() {
-  const { projects, currentProject, loading, live } = useClientProjects();
+  const { projects, currentProject, loading, live, error } = useClientProjects();
 
   if (loading) {
     return <div className="mx-auto max-w-[1300px] space-y-4"><div className="panel h-32 animate-pulse" /><div className="grid gap-4 md:grid-cols-3"><div className="panel h-36 animate-pulse" /><div className="panel h-36 animate-pulse" /><div className="panel h-36 animate-pulse" /></div></div>;
@@ -44,20 +45,21 @@ export default function DashboardClient() {
       <div className="mx-auto max-w-3xl">
         <div className="panel p-8">
           <div className="mono-label">CLIENT PORTAL</div>
-          <h1 className="mt-2 text-3xl font-bold">Aun no hay proyectos vinculados</h1>
-          <p className="mt-3 text-sm leading-6 text-cb-muted">Tu cuenta esta activa, pero CBDEVS todavia no ha vinculado un proyecto a este correo. Cuando este listo, aqui veras avances, entregas, documentos y mensajes.</p>
+          <h1 className="mt-2 text-3xl font-bold">{error ? "No se pudieron cargar los proyectos" : "Aún no hay proyectos vinculados"}</h1>
+          <p className="mt-3 text-sm leading-6 text-cb-muted">{error || "Tu cuenta está activa, pero CBDEVS todavía no ha vinculado un proyecto a esta cuenta. Cuando esté listo, aquí verás avances, entregas, documentos y mensajes."}</p>
         </div>
       </div>
     );
   }
 
+  const productionUrl = safeExternalUrl(currentProject.productionUrl);
   const progress = progressFor(currentProject);
   const balance = Math.max(currentProject.amount - currentProject.initialPayment, 0);
   const completed = currentProject.milestones?.filter(m => m.status === "Completado").length ?? 0;
   const totalMilestones = currentProject.milestones?.length ?? 0;
 
   const cards = [
-    { label: "Avance del proyecto", value: `${progress}%`, icon: FolderKanban, note: live ? "Datos en vivo" : "Modo demo" },
+    { label: "Avance del proyecto", value: `${progress}%`, icon: FolderKanban, note: live ? "Datos de Supabase" : "Conexión no disponible" },
     { label: "Siguiente entrega", value: currentProject.estimatedDelivery, icon: CalendarClock, note: currentProject.deliveryStatus },
     { label: "Saldo estimado", value: money(balance, currentProject.currency), icon: CircleDollarSign, note: currentProject.paymentStatus },
     { label: "Hitos completados", value: `${completed}/${totalMilestones || 1}`, icon: CheckCircle2, note: "Checklist de trabajo" },
@@ -87,7 +89,7 @@ export default function DashboardClient() {
           </div>
 
           <div className="mt-6 flex flex-wrap gap-3">
-            {currentProject.productionUrl && <a href={currentProject.productionUrl} target="_blank" className="btn-primary">Ver entrega <ArrowUpRight size={16} /></a>}
+            {productionUrl && <a href={productionUrl} target="_blank" rel="noopener noreferrer" className="btn-primary">Ver entrega <ArrowUpRight size={16} /></a>}
             <Link href="/chat" className="btn-ghost"><MessageSquare size={16} /> Mensajes</Link>
             {currentProject.nextMaintenanceDate && <Link href="/billing" className="btn-ghost"><Wrench size={16} /> Mantenimiento</Link>}
           </div>

@@ -1,117 +1,98 @@
 "use client";
 
-import { onAuthStateChanged, signOut, User } from "firebase/auth";
-import { doc, getDoc } from "firebase/firestore";
-import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { getAuthClient, getDbClient } from "@/lib/firebase";
-import { AlertTriangle } from "lucide-react";
-import type { UserProfile } from "@/lib/types";
+import { usePathname, useRouter } from "next/navigation";
+import { AlertTriangle, LogOut, ShieldCheck } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 
-export default function AuthGuard({
-  children,
-}: {
-  children: React.ReactNode;
-}) {
+type GuardState = "checking" | "allowed" | "unlinked" | "error";
+
+export default function AuthGuard({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-
-  const [ready, setReady] = useState(false);
-  const [profile, setProfile] = useState<UserProfile | null>(null);
-  const [configError, setConfigError] = useState(false);
+  const [state, setState] = useState<GuardState>("checking");
 
   useEffect(() => {
-    let unsubscribe: (() => void) | null = null;
-
+    let active = true;
+    let supabase: ReturnType<typeof createClient>;
     try {
-      const auth = getAuthClient();
-      if (!auth) {
-        console.error("[AuthGuard] Firebase Auth not initialized. Check your environment variables in Vercel.");
-        setConfigError(true);
-        setReady(true);
-        return;
-      }
+      supabase = createClient();
+    } catch {
+      setState("error");
+      return;
+    }
 
-      unsubscribe = onAuthStateChanged(auth, async (user: User | null) => {
-        if (!user) {
-          setProfile(null);
-          setReady(true);
+    async function verify() {
+      setState("checking");
+      try {
+        const { data, error } = await supabase.auth.getUser();
+        if (!active) return;
 
-          if (pathname !== "/login") {
-            router.replace("/login");
-          }
-
+        if (error || !data.user) {
+          router.replace(`/login?next=${encodeURIComponent(pathname || "/dashboard")}`);
           return;
         }
 
-        try {
-          const db = getDbClient();
-          if (!db) throw new Error("Firestore not initialized");
-          const snap = await getDoc(doc(db, "users", user.uid));
+        const { data: clients, error: clientError } = await supabase
+          .from("cbdevs_clients")
+          .select("id")
+          .eq("linked_user_id", data.user.id)
+          .eq("active", true)
+          .limit(1);
 
-          if (!snap.exists()) {
-            const authClient = getAuthClient();
-            if (authClient) await signOut(authClient);
-            router.replace("/login");
-            return;
-          }
-
-          const p = {
-            id: user.uid,
-            ...snap.data(),
-          } as UserProfile;
-
-          if (!p.active || !["cliente", "admin"].includes(p.role)) {
-            const authClient = getAuthClient();
-            if (authClient) await signOut(authClient);
-            router.replace("/login");
-            return;
-          }
-
-          setProfile(p);
-          setReady(true);
-        } catch (error) {
-          console.error("[AuthGuard] Session verification error:", error);
-          const authClient = getAuthClient();
-          if (authClient) await signOut(authClient);
-          router.replace("/login");
+        if (!active) return;
+        if (clientError) {
+          console.error("[AuthGuard] Client authorization lookup failed:", clientError.code);
+          setState("error");
+          return;
         }
-      });
-    } catch (criticalError) {
-      console.error("[AuthGuard] Critical initialization failure:", criticalError);
-      setConfigError(true);
-      setReady(true);
+        setState(clients?.length ? "allowed" : "unlinked");
+      } catch {
+        if (active) setState("error");
+      }
     }
 
+    void verify();
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, session) => {
+      if (!session) router.replace("/login");
+      else void verify();
+    });
+
     return () => {
-      if (unsubscribe) unsubscribe();
+      active = false;
+      listener.subscription.unsubscribe();
     };
   }, [pathname, router]);
 
-  if (!ready) {
+  if (state === "checking") {
+    return <div className="grid min-h-screen place-items-center bg-cb-bg text-sm text-cb-muted" role="status">Verificando sesión segura...</div>;
+  }
+
+  if (state === "unlinked") {
     return (
-      <div className="min-h-screen grid place-items-center bg-cb-bg text-cb-muted">
-        Cargando sesión...
-      </div>
+      <main className="grid min-h-screen place-items-center bg-cb-bg p-5">
+        <section className="panel w-full max-w-lg p-8 text-center">
+          <ShieldCheck className="mx-auto mb-4 text-cb-amber" size={32} />
+          <h1 className="text-2xl font-bold">Cuenta pendiente de vinculación</h1>
+          <p className="mt-3 text-sm leading-6 text-cb-muted">Tu sesión es válida, pero esta cuenta todavía no está vinculada a un cliente activo de CBDEVS. Por seguridad, no mostramos proyectos ni pagos hasta que el equipo vincule tu cuenta.</p>
+          <button className="btn-primary mt-6" onClick={async () => { await createClient().auth.signOut(); router.replace("/login"); }}>
+            <LogOut size={16} /> Cerrar sesión
+          </button>
+        </section>
+      </main>
     );
   }
 
-  if (configError) {
+  if (state === "error") {
     return (
-      <div className="min-h-screen grid place-items-center bg-cb-bg p-6 text-center">
-        <div className="panel max-w-md p-8">
-          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-full bg-red-500/10 text-red-500">
-            <AlertTriangle size={24} />
-          </div>
-          <h1 className="text-xl font-bold text-white">Error de Configuración</h1>
-          <p className="mt-2 text-sm text-slate-400">
-            No se pudieron cargar las llaves de Firebase. Por favor, verifica las variables de entorno en Vercel.
-          </p>
-          <div className="mt-6 font-mono text-[10px] uppercase tracking-wider text-slate-600">
-            Firebase Initialization Failed
-          </div>
-        </div>
-      </div>
+      <main className="grid min-h-screen place-items-center bg-cb-bg p-5">
+        <section className="panel w-full max-w-lg p-8 text-center">
+          <AlertTriangle className="mx-auto mb-4 text-red-400" size={30} />
+          <h1 className="text-xl font-bold">No se pudo verificar el acceso</h1>
+          <p className="mt-3 text-sm text-cb-muted">No pudimos confirmar los permisos de esta cuenta. No se cargaron datos privados. Intenta nuevamente más tarde.</p>
+          <button className="btn-ghost mt-5" onClick={() => window.location.reload()}>Reintentar</button>
+        </section>
+      </main>
     );
   }
 
