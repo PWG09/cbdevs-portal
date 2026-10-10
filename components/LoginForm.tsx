@@ -10,12 +10,14 @@ export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
 
   async function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setError("");
+    setNotice("");
     setLoading(true);
 
     try {
@@ -46,6 +48,7 @@ export default function LoginForm() {
 
   async function resetPassword() {
     setError("");
+    setNotice("");
     if (!email.trim()) {
       setError("Escribe tu correo para enviarte el enlace de recuperación.");
       return;
@@ -58,7 +61,7 @@ export default function LoginForm() {
       if (resetError) {
         setError("No se pudo solicitar la recuperación. Revisa el correo e inténtalo de nuevo.");
       } else {
-        setError("Si existe una cuenta con ese correo, recibirás instrucciones para recuperar el acceso.");
+        setNotice("Si existe una cuenta con ese correo, recibirás instrucciones para recuperar el acceso.");
       }
     } catch {
       setError("No fue posible solicitar la recuperación en este momento.");
@@ -100,7 +103,8 @@ export default function LoginForm() {
             </span>
           </label>
 
-          {error && <div className="my-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200" role="status">{error}</div>}
+          {error && <div className="my-4 rounded-xl border border-red-500/20 bg-red-500/10 p-3 text-sm text-red-200" role="alert">{error}</div>}
+          {notice && <div className="my-4 rounded-xl border border-emerald-500/20 bg-emerald-500/10 p-3 text-sm text-emerald-200" role="status">{notice}</div>}
 
           <button className="btn-primary mt-4 w-full" disabled={loading}>
             <ShieldCheck size={17} />
