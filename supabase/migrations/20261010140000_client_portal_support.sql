@@ -68,7 +68,7 @@ for insert to authenticated
 with check (
   private.has_org_role(organization_id, array['owner','admin','manager']::text[])
   and private.can_access_app(organization_id, 'admin')
-  and exists (select 1 from public.cbdevs_projects p where p.id = project_id and p.organization_id = organization_id)
+  and exists (select 1 from public.cbdevs_projects p where p.id = cbdevs_project_milestones.project_id and p.organization_id = cbdevs_project_milestones.organization_id)
 );
 
 drop policy if exists cbdevs_milestones_admin_update on public.cbdevs_project_milestones;
@@ -78,7 +78,7 @@ using (private.has_org_role(organization_id, array['owner','admin','manager']::t
 with check (
   private.has_org_role(organization_id, array['owner','admin','manager']::text[])
   and private.can_access_app(organization_id, 'admin')
-  and exists (select 1 from public.cbdevs_projects p where p.id = project_id and p.organization_id = organization_id)
+  and exists (select 1 from public.cbdevs_projects p where p.id = cbdevs_project_documents.project_id and p.organization_id = cbdevs_project_documents.organization_id)
 );
 
 drop policy if exists cbdevs_milestones_admin_delete on public.cbdevs_project_milestones;
@@ -221,8 +221,8 @@ with check (
     from public.cbdevs_channels ch
     join public.cbdevs_projects p on p.id = ch.project_id and p.organization_id = ch.organization_id
     join public.cbdevs_clients c on c.id = p.client_id and c.organization_id = p.organization_id
-    where ch.id = channel_id
-      and ch.organization_id = organization_id
+    where ch.id = cbdevs_messages.channel_id
+      and ch.organization_id = cbdevs_messages.organization_id
       and c.linked_user_id = (select auth.uid())
       and c.active
   )
