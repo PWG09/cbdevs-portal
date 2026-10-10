@@ -111,7 +111,7 @@ for insert to authenticated
 with check (
   private.has_org_role(organization_id, array['owner','admin','manager']::text[])
   and private.can_access_app(organization_id, 'admin')
-  and exists (select 1 from public.cbdevs_projects p where p.id = project_id and p.organization_id = organization_id)
+  and exists (select 1 from public.cbdevs_projects p where p.id = cbdevs_project_documents.project_id and p.organization_id = cbdevs_project_documents.organization_id)
 );
 
 drop policy if exists cbdevs_documents_admin_update on public.cbdevs_project_documents;
@@ -121,7 +121,7 @@ using (private.has_org_role(organization_id, array['owner','admin','manager']::t
 with check (
   private.has_org_role(organization_id, array['owner','admin','manager']::text[])
   and private.can_access_app(organization_id, 'admin')
-  and exists (select 1 from public.cbdevs_projects p where p.id = project_id and p.organization_id = organization_id)
+  and exists (select 1 from public.cbdevs_projects p where p.id = cbdevs_project_documents.project_id and p.organization_id = cbdevs_project_documents.organization_id)
 );
 
 drop policy if exists cbdevs_documents_admin_delete on public.cbdevs_project_documents;
@@ -255,7 +255,7 @@ begin
   on conflict do nothing;
   return new;
 end;
-$;
+$$;
 
 revoke all on function private.create_project_channel() from public, anon, authenticated;
 
