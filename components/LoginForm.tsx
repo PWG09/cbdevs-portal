@@ -56,7 +56,8 @@ export default function LoginForm() {
     setLoading(true);
     try {
       const supabase = createClient();
-      const redirectTo = `${window.location.origin}/reset-password`;
+      const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || window.location.origin;
+      const redirectTo = `${siteUrl.replace(/\/$/, "")}/reset-password`;
       const { error: resetError } = await supabase.auth.resetPasswordForEmail(email.trim().toLowerCase(), { redirectTo });
       if (resetError) {
         setError("No se pudo solicitar la recuperación. Revisa el correo e inténtalo de nuevo.");
