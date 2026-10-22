@@ -19,13 +19,17 @@ body {
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
 ::selection { background: rgba(242,169,80,.25); }
+:focus-visible { outline: 2px solid #f2a950; outline-offset: 2px; border-radius: 6px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .01ms !important; transition-duration: .01ms !important; scroll-behavior: auto !important; }
+}
 
 @layer components {
   .panel {
     @apply rounded-2xl border border-cb-line bg-cb-panel shadow-glow;
   }
   .input {
-    @apply w-full rounded-xl border border-cb-line bg-cb-bg px-3 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-600 focus:border-cb-amber;
+    @apply w-full rounded-xl border border-cb-line bg-cb-bg px-3 py-2.5 text-sm text-white outline-none transition placeholder:text-slate-500 focus:border-cb-amber focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-60;
   }
   .btn {
     @apply inline-flex items-center justify-center gap-2 rounded-xl px-4 py-2.5 text-sm font-semibold transition disabled:cursor-not-allowed disabled:opacity-50;
