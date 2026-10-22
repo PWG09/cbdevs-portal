@@ -84,7 +84,7 @@ export default function LoginForm() {
 
         <form onSubmit={submit} className="panel p-6">
           <div className="mb-6">
-            <div className="mono-label">AUTH / CLIENT</div>
+            <div className="mono-label">Acceso de clientes</div>
             <h1 className="mt-2 text-2xl font-bold">Iniciar sesión</h1>
             <p className="mt-1 text-sm text-cb-muted">Consulta el avance, las entregas y los mensajes de tu proyecto.</p>
           </div>
@@ -98,7 +98,7 @@ export default function LoginForm() {
             <span className="mb-2 block text-slate-300">Contraseña</span>
             <span className="relative block">
               <input className="input pr-12" type={showPassword ? "text" : "password"} autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} required maxLength={128} />
-              <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-cb-muted" aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"}>
+              <button type="button" onClick={() => setShowPassword((value) => !value)} className="absolute right-3 top-1/2 -translate-y-1/2 text-cb-muted" aria-label={showPassword ? "Ocultar contraseña" : "Mostrar contraseña"} aria-pressed={showPassword}>
                 {showPassword ? <EyeOff size={17} /> : <Eye size={17} />}
               </button>
             </span>
@@ -116,7 +116,7 @@ export default function LoginForm() {
           </button>
         </form>
 
-        <p className="mt-5 text-center text-xs text-slate-600">Acceso privado administrado por CBDEVS · Supabase Auth</p>
+        <p className="mt-5 text-center text-xs text-slate-600">Acceso privado para clientes de CBDEVS · Conexión cifrada</p>
       </div>
     </main>
   );

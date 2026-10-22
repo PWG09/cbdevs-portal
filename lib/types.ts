@@ -36,7 +36,7 @@ export interface Project {
   serviceType: ServiceType;
   deliveryStatus: DeliveryStatus;
   paymentStatus: PaymentStatus;
-  currency: "MXN" | "USD" | string;
+  currency: "MXN" | "USD" | "CAD" | string;
   amount: number;
   initialPayment: number;
   monthlyMaintenance: number;
@@ -74,12 +74,23 @@ export interface PaymentRecord {
   id: string;
   projectId?: string;
   amount: number;
-  currency: "MXN" | "USD" | string;
-  status: "pending" | "paid" | "failed" | "refunded" | string;
+  currency: "MXN" | "USD" | "CAD" | string;
+  status: "pending" | "paid" | "failed" | "refunded" | "cancelled" | string;
   description: string;
-  checkoutUrl?: string;
+  reference?: string;
   createdAt?: string;
   paidAt?: string;
+}
+
+export interface PaymentLink {
+  id: string;
+  projectId?: string;
+  amount: number;
+  currency: string;
+  url: string;
+  status: string;
+  expiresAt?: string;
+  createdAt: string;
 }
 
 export interface ChatMessage {
@@ -87,6 +98,7 @@ export interface ChatMessage {
   channelId: string;
   senderId: string;
   senderName: string;
+  mine: boolean;
   text: string;
   createdAt?: string;
 }

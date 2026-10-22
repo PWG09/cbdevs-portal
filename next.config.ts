@@ -1,6 +1,18 @@
 import type { NextConfig } from "next";
 
-const supabaseOrigin = "https://rpfupihdsqxprhptxypv.supabase.co";
+// Derive the API origin from configuration so Preview/staging projects work without editing CSP.
+function supabaseOrigins(): string {
+  const fallback = "https://rpfupihdsqxprhptxypv.supabase.co";
+  let origin = fallback;
+  try {
+    origin = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL || fallback).origin;
+  } catch {
+    origin = fallback;
+  }
+  const realtime = origin.replace(/^http/, "ws");
+  return `${origin} ${realtime}`;
+}
+
 const contentSecurityPolicy = [
   "default-src 'self'",
   "base-uri 'self'",
@@ -11,7 +23,7 @@ const contentSecurityPolicy = [
   "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
   "img-src 'self' data: blob: https:",
   "font-src 'self' data: https://fonts.gstatic.com https:",
-  `connect-src 'self' ${supabaseOrigin} wss://rpfupihdsqxprhptxypv.supabase.co`,
+  `connect-src 'self' ${supabaseOrigins()}`,
   "upgrade-insecure-requests",
 ].join("; ");
 
