@@ -12,9 +12,11 @@ export default function ResetPasswordPage() {
   const [ready, setReady] = useState(false);
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState("");
+  const [welcome, setWelcome] = useState(false);
 
   useEffect(() => {
     let active = true;
+    setWelcome(new URLSearchParams(window.location.search).get("welcome") === "1");
     const supabase = createClient();
     void supabase.auth.getSession().then(({ data }) => {
       if (active) {
@@ -45,7 +47,7 @@ export default function ResetPasswordPage() {
       return;
     }
     await supabase.auth.signOut();
-    setMessage("Contraseña actualizada. Ya puedes iniciar sesión.");
+    setMessage(welcome ? "Contraseña creada. Inicia sesión con tu correo y tu nueva contraseña." : "Contraseña actualizada. Ya puedes iniciar sesión.");
     setTimeout(() => router.replace("/login"), 1200);
   }
 
@@ -53,8 +55,8 @@ export default function ResetPasswordPage() {
     <main className="grid min-h-screen place-items-center bg-cb-bg p-4">
       <section className="panel w-full max-w-md p-6">
         <div className="mb-5 grid h-12 w-12 place-items-center rounded-xl border border-cb-line bg-cb-panel2 text-cb-amber"><KeyRound /></div>
-        <h1 className="text-2xl font-bold">Restablecer contraseña</h1>
-        <p className="mt-2 text-sm text-cb-muted">Usa una contraseña única de al menos 12 caracteres.</p>
+        <h1 className="text-2xl font-bold">{welcome ? "Bienvenido al portal de CBDEVS" : "Restablecer contraseña"}</h1>
+        <p className="mt-2 text-sm text-cb-muted">{welcome ? "Crea tu contraseña para entrar a tu portal de cliente. Usa al menos 12 caracteres." : "Usa una contraseña única de al menos 12 caracteres."}</p>
         {ready ? (
           <form onSubmit={submit} className="mt-6 space-y-4">
             <label className="block text-sm"><span className="mb-2 block">Nueva contraseña</span><input className="input" type="password" autoComplete="new-password" minLength={12} maxLength={128} value={password} onChange={(event) => setPassword(event.target.value)} required /></label>
