@@ -7,12 +7,36 @@ import { createClient } from "@/lib/supabase/client";
 import { ViewerContext, type Viewer } from "@/components/ViewerContext";
 import BrandMark from "@/components/BrandMark";
 
-// Explicit allowlist for the CBDEVS Portal global administrator.
+// Explicit allowlist kept for the original designated administrator; organization owners/admins
+// with the client-portal app enabled are also recognized as staff (see isPortalStaff).
 // Use the immutable Supabase Auth user ID, never an email-only check. This is a UX gate only:
 // row-level security still decides which records the account can read.
 const GLOBAL_ADMIN_USER_IDS = new Set([
   "ec735f4c-fdb8-4d6b-b672-c2574ff34832",
 ]);
+
+/**
+ * Staff access: an active owner/admin of an organization that has the `client-portal` app enabled.
+ * Both tables are readable only for the user's own memberships (RLS). Any lookup failure returns
+ * false so the account falls back to the normal client check.
+ */
+async function isPortalStaff(supabase: ReturnType<typeof createClient>, userId: string): Promise<boolean> {
+  const { data: memberships, error } = await supabase
+    .from("organization_members")
+    .select("organization_id")
+    .eq("user_id", userId)
+    .eq("status", "active")
+    .in("role", ["owner", "admin"]);
+  if (error || !memberships?.length) return false;
+  const { data: apps, error: appError } = await supabase
+    .from("organization_apps")
+    .select("organization_id")
+    .in("organization_id", memberships.map((m: { organization_id: string }) => m.organization_id))
+    .eq("app_key", "client-portal")
+    .eq("enabled", true)
+    .limit(1);
+  return !appError && Boolean(apps?.length);
+}
 
 type GuardState = "checking" | "allowed" | "unlinked" | "error";
 
@@ -42,7 +66,8 @@ export default function AuthGuard({ children }: { children: React.ReactNode }) {
           return;
         }
 
-        const isGlobalAdmin = GLOBAL_ADMIN_USER_IDS.has(data.user.id);
+        const isGlobalAdmin = GLOBAL_ADMIN_USER_IDS.has(data.user.id) || await isPortalStaff(supabase, data.user.id);
+        if (!active) return;
         setViewer({ userId: data.user.id, email: data.user.email ?? "", isGlobalAdmin });
 
         // Global admin accounts are staff accounts, not customer records.
