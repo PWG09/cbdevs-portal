@@ -32,8 +32,22 @@ Quality checks:
 ```bash
 npm run lint
 npm run typecheck
+npm test        # unit tests for formatting, status, progress and billing math
 npm run build
 ```
+
+`npm run check` runs lint, typecheck and tests together.
+
+## Client features
+
+- **Resumen**: project progress (from milestones, or an approximate value from the delivery status), delivery date, milestones, recorded balance, maintenance and recent documents.
+- **Proyecto**: full milestone timeline, project dates, production/proposal links and documents filterable by type.
+- **Pagos**: active checkout links, totals computed from payments recorded as `paid` for the project (never from client input), and full payment history.
+- **Mensajes**: private project chat with Supabase Realtime (`cbdevs_messages` is in the `supabase_realtime` publication) plus a 30-second fallback poll.
+- **Perfil**: display name and password change.
+- Clients with several projects get a project switcher in the header; the choice is remembered per browser.
+
+Only HTTPS links without embedded credentials are rendered; anything else stored in the database is hidden.
 
 ## Supabase schema
 
